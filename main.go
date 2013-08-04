@@ -1,11 +1,11 @@
 package main
 
 import (
-  "flag"
 	"code.google.com/p/go-html-transform/h5"
 	"code.google.com/p/go-html-transform/html/transform"
 	"code.google.com/p/go.net/html"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -13,8 +13,8 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 type Downloader struct {
@@ -44,6 +44,7 @@ func (d *Downloader) Start() {
 	}
 	list := fetchPage(d.urlBase, extractLinks)
 	size = len(list)
+	fmt.Printf("%d files found. Downloading...\n", size)
 	for _, href := range list {
 		links <- Job{url: d.urlBase + href, dest: d.dest, filename: href}
 	}
@@ -90,14 +91,14 @@ func worker(name string, jobs <-chan Job) {
 		//fmt.Printf("[%s] Downloading %s...\n", name, job.url)
 		err := download(job.url, filepath.Join(job.dest, job.filename))
 		i++
-    bar := progress(i)
-    os.Stdout.Write([]byte(bar + "\r"))
-    os.Stdout.Sync()
+		bar := progress(i)
+		os.Stdout.Write([]byte(bar + "\r"))
+		os.Stdout.Sync()
 		if err != nil {
 			log.Fatal("Download failed")
 		}
 	}
-  //os.Stdout.Write([]byte("\n"))
+	//os.Stdout.Write([]byte("\n"))
 }
 
 func bold(str string) string {
@@ -110,19 +111,17 @@ func progress(current int) string {
 	return bold(prefix)
 }
 
-
 func main() {
-  usr, err := user.Current()
-  if err != nil {
-    log.Fatal(err)
-  }
+	usr, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-  workers := flag.Int("w", 1, "Number of workers")
-  dest := flag.String("d", usr.HomeDir, "Directory to downloaded files")
-  url := flag.String("u", "http://www.textfiles.com/programming/", "Url to download files")
-  flag.Parse()
+	workers := flag.Int("w", 1, "Number of workers")
+	dest := flag.String("d", usr.HomeDir, "Directory to downloaded files")
+	url := flag.String("u", "http://www.textfiles.com/programming/", "Url to download files")
+	flag.Parse()
 
-  d := New(*workers, *url, *dest)
-  d.Start()
+	d := New(*workers, *url, *dest)
+	d.Start()
 }
-
