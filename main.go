@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type Downloader struct {
@@ -29,7 +30,7 @@ type Job struct {
 	filename string
 }
 
-var i int = 0
+var jobsDone int = 0
 var size int = 0
 
 func New(workers int, url string, dest string) *Downloader {
@@ -38,16 +39,31 @@ func New(workers int, url string, dest string) *Downloader {
 
 func (d *Downloader) Start() {
 	links := make(chan Job)
-
+	var group sync.WaitGroup
 	for i := 1; i <= d.workers; i++ {
-		go worker(fmt.Sprintf("WORKER %d", i), links)
+		go func(name string, jobs <-chan Job) {
+			for job := range jobs {
+				fmt.Printf("[%s] Downloading %s...\n", name, job.url)
+				err := download(job.url, filepath.Join(job.dest, job.filename))
+				jobsDone++
+//      bar := progress(jobsDone)
+//			os.Stdout.Write([]byte(bar + "\r"))
+//			os.Stdout.Sync()
+				if err != nil {
+					log.Fatal("Download failed", err)
+				}
+				group.Done()
+			}
+		}(fmt.Sprintf("WORKER %d", i), links)
 	}
 	list := fetchPage(d.urlBase, extractLinks)
 	size = len(list)
 	fmt.Printf("%d files found. Downloading...\n", size)
 	for _, href := range list {
 		links <- Job{url: d.urlBase + href, dest: d.dest, filename: href}
+		group.Add(1)
 	}
+	group.Wait()
 }
 
 func fetchPage(url string, fn func(io.Reader) []string) []string {
@@ -85,20 +101,6 @@ func download(url string, filename string) error {
 
 	io.Copy(outputFile, res.Body)
 	return nil
-}
-func worker(name string, jobs <-chan Job) {
-	for job := range jobs {
-		//fmt.Printf("[%s] Downloading %s...\n", name, job.url)
-		err := download(job.url, filepath.Join(job.dest, job.filename))
-		i++
-		bar := progress(i)
-		os.Stdout.Write([]byte(bar + "\r"))
-		os.Stdout.Sync()
-		if err != nil {
-			log.Fatal("Download failed")
-		}
-	}
-	//os.Stdout.Write([]byte("\n"))
 }
 
 func bold(str string) string {
